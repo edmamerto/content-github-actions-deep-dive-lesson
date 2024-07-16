@@ -1,0 +1,21 @@
+name: Manual Environment Greeting
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  print-hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Hello, World!
+        run: echo "Hello, World! Environment: ${{ github.event.inputs.environment }}"
