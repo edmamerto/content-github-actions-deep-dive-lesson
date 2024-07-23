@@ -32,7 +32,7 @@ env:
 
 jobs:
   extract-and-set-vars:
-    runs-on: [ "self-hosted", "intentsify", "dev" ]
+    runs-on: ubuntu-latest
     outputs:
       stack-prefix: ${{ steps.set-vars.outputs.stack-prefix }}
       stack-suffix: ${{ steps.set-vars.outputs.stack-suffix }}
