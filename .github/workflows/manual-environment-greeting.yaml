@@ -1,4 +1,4 @@
-name: update-infra-stack-manually
+name: update-stack-manually
 
 on:
   workflow_dispatch:
@@ -34,8 +34,7 @@ jobs:
   extract-and-set-vars:
     runs-on: ubuntu-latest
     outputs:
-      stack-prefix: ${{ steps.set-vars.outputs.stack-prefix }}
-      stack-suffix: ${{ steps.set-vars.outputs.stack-suffix }}
+      stack-name: ${{ steps.set-vars.outputs.stack-name }}
       apply: ${{ steps.set-vars.outputs.apply }}
     steps:
       - name: Extract stack parts and set output
@@ -50,32 +49,29 @@ jobs:
             APPLY=true
           fi
 
-          IFS='-' read -r STACK_PREFIX STACK_SUFFIX <<< "$STACK"
-
-          if [ -z "$STACK_SUFFIX" ]; then
+          # Check if the stack has a suffix
+          if [[ "$STACK" == *"-"* ]]; then
+            STACK_NAME=$STACK
+            if [ "$ENVIRONMENT" != "default" ]; then
+              echo "Environment input should be 'default' for suffixed stacks."
+              exit 1
+            fi
+          else
             if [ -z "$ENVIRONMENT" ] || [ "$ENVIRONMENT" = "default" ]; then
               echo "Environment input is required for non-suffixed stacks."
               exit 1
             fi
-            STACK_SUFFIX=$ENVIRONMENT
-          else
-            if [ "$ENVIRONMENT" = "default" ]; then
-              STACK_SUFFIX=$STACK_SUFFIX
-            else
-              echo "Environment input should be 'default' for suffixed stacks."
-              exit 1
-            fi
+            STACK_NAME=$STACK
           fi
 
-          echo "::set-output name=stack-prefix::$STACK_PREFIX"
-          echo "::set-output name=stack-suffix::$STACK_SUFFIX"
+          echo "::set-output name=stack-name::$STACK_NAME"
           echo "::set-output name=apply::$APPLY"
 
   update-stack:
     needs: extract-and-set-vars
     uses: ./.github/workflows/_run_pulumi.yaml
     with:
-      work-dir: ./.infrastructure/${{ needs.extract-and-set-vars.outputs.stack-prefix }}
-      stack: ${{ github.event.inputs.stack }}-${{ needs.extract-and-set-vars.outputs.stack-suffix }}
-      runner-stage: ${{ needs.extract-and-set-vars.outputs.stack-suffix }}
+      work-dir: ./.infrastructure/${{ needs.extract-and-set-vars.outputs.stack-name }}
+      stack: ${{ github.event.inputs.stack }}
+      runner-stage: ${{ github.event.inputs.environment }}
       apply: ${{ fromJson(needs.extract-and-set-vars.outputs.apply) }}
