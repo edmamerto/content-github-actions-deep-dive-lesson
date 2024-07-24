@@ -4,14 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       stack:
-        description: 'Select the specific stack to update (e.g., acm-prod or observability)'
+        description: 'Select the stack (e.g., "acm-prod" or "observability").'
         type: choice
         required: true
         options:
+          - select
           - acm-prod
           - observability
+      custom-stack:
+        description: 'Enter a custom stack name.'
+        type: string
+        required: false
       environment:
-        description: 'Select the environment (e.g., dev) - required for non-suffixed stacks'
+        description: 'Select the environment ("default" for suffixed stacks).'
         type: choice
         required: false
         options:
@@ -20,7 +25,7 @@ on:
           - prod
           - default
       action:
-        description: 'Select the action to perform (preview or update)'
+        description: 'Select the action ("preview" or "update").'
         type: choice
         required: true
         options:
@@ -41,6 +46,7 @@ jobs:
         id: set-vars
         run: |
           STACK=${{ github.event.inputs.stack }}
+          CUSTOM_STACK=${{ github.event.inputs.custom-stack }}
           ENVIRONMENT=${{ github.event.inputs.environment }}
           ACTION=${{ github.event.inputs.action }}
           APPLY=false
@@ -49,19 +55,29 @@ jobs:
             APPLY=true
           fi
 
-          # Check if the stack has a suffix
-          if [[ "$STACK" == *"-"* ]]; then
-            STACK_NAME=$STACK
-            if [ "$ENVIRONMENT" != "default" ]; then
-              echo "Environment input should be 'default' for suffixed stacks."
-              exit 1
-            fi
+          if [ -n "$CUSTOM_STACK" ]; then
+            STACK="select"
+            STACK_NAME=$CUSTOM_STACK
           else
-            if [ -z "$ENVIRONMENT" ] || [ "$ENVIRONMENT" = "default" ]; then
-              echo "Environment input is required for non-suffixed stacks."
+            if [ "$STACK" = "select" ]; then
+              echo "You must select a valid stack or enter a custom stack name."
               exit 1
             fi
-            STACK_NAME=$STACK
+
+            # Check if the stack has a suffix
+            if [[ "$STACK" == *"-"* ]]; then
+              STACK_NAME=$STACK
+              if [ "$ENVIRONMENT" != "default" ]; then
+                echo "Environment should be 'default' for suffixed stacks."
+                exit 1
+              fi
+            else
+              if [ -z "$ENVIRONMENT" ] || [ "$ENVIRONMENT" = "default" ]; then
+                echo "Environment is required for non-suffixed stacks."
+                exit 1
+              fi
+              STACK_NAME=$STACK
+            fi
           fi
 
           echo "::set-output name=stack-name::$STACK_NAME"
@@ -72,6 +88,6 @@ jobs:
     uses: ./.github/workflows/_run_pulumi.yaml
     with:
       work-dir: ./.infrastructure/${{ needs.extract-and-set-vars.outputs.stack-name }}
-      stack: ${{ github.event.inputs.stack }}
+      stack: ${{ needs.extract-and-set-vars.outputs.stack-name }}
       runner-stage: ${{ github.event.inputs.environment }}
       apply: ${{ fromJson(needs.extract-and-set-vars.outputs.apply) }}
