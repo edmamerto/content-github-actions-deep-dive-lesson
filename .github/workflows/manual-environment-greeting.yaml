@@ -56,7 +56,10 @@ jobs:
           fi
 
           if [ -n "$CUSTOM_STACK" ]; then
-            STACK="select"
+            if [ "$STACK" != "select" ]; then
+              echo "If a custom stack is entered, the stack option must be set to 'select'."
+              exit 1
+            fi
             STACK_NAME=$CUSTOM_STACK
           else
             if [ "$STACK" = "select" ]; then
